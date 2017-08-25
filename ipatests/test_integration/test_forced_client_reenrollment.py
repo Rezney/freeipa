@@ -270,7 +270,8 @@ class TestForcedClientReenrollment(IntegrationTest):
         contents = self.master.get_file_contents(self.BACKUP_KEYTAB)
         self.clients[0].put_file_contents(self.BACKUP_KEYTAB, contents)
 
-    def fix_resolv_conf(self, client, server):
+    @classmethod
+    def fix_resolv_conf(cls, client, server):
         """
         Put server's ip address at the top of resolv.conf
         """
@@ -281,9 +282,9 @@ class TestForcedClientReenrollment(IntegrationTest):
             contents = nameserver + contents.replace(nameserver, '')
             client.put_file_contents(paths.RESOLV_CONF, contents)
 
-
 @pytest.fixture()
 def client(request):
+    request.cls.fix_resolv_conf(request.cls.clients[0], request.cls.master)
     tasks.install_client(request.cls.master, request.cls.clients[0])
 
     def teardown_client():
