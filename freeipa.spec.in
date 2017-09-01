@@ -281,8 +281,9 @@ Requires: %{name}-client = %{version}-%{release}
 Requires: %{name}-common = %{version}-%{release}
 %if 0%{?with_python3}
 Requires: python3-ipaserver = %{version}-%{release}
-%endif
+%else
 Requires: python2-ipaserver = %{version}-%{release}
+%endif
 Requires: 389-ds-base >= 1.3.5.14
 Requires: openldap-clients > 2.4.35-4
 Requires: nss >= 3.14.3-12.0
@@ -320,7 +321,8 @@ Requires(preun): python systemd-units
 Requires(postun): python systemd-units
 Requires: policycoreutils >= 2.1.12-5
 Requires: tar
-Requires(pre): certmonger >= 0.78
+# certmonger-0.79.4-2 fixes newlines in PEM files
+Requires(pre): certmonger >= 0.79.4-2
 Requires(pre): 389-ds-base >= 1.3.5.14
 Requires: fontawesome-fonts
 Requires: open-sans-fonts
@@ -459,6 +461,10 @@ Requires: bind-utils >= 9.11.0-6.P2
 Requires: bind-pkcs11 >= 9.11.0-6.P2
 Requires: bind-pkcs11-utils >= 9.11.0-6.P2
 Requires: opendnssec >= 1.4.6-4
+# Keep python2 dependencies until DNSSEC daemons are ported to Python 3
+Requires: python2
+Requires: python2-ipalib
+Requires: python2-ipaserver
 
 Provides: %{alt_name}-server-dns = %{version}
 Conflicts: %{alt_name}-server-dns
@@ -511,8 +517,9 @@ Requires: %{name}-client-common = %{version}-%{release}
 Requires: %{name}-common = %{version}-%{release}
 %if 0%{?with_python3}
 Requires: python3-ipaclient = %{version}-%{release}
-%endif
+%else
 Requires: python2-ipaclient = %{version}-%{release}
+%endif
 Requires: python-ldap
 Requires: cyrus-sasl-gssapi%{?_isa}
 Requires: ntp
@@ -525,7 +532,8 @@ Requires: libcurl >= 7.21.7-2
 Requires: xmlrpc-c >= 1.27.4
 Requires: sssd >= 1.14.0
 Requires: python-sssdconfig
-Requires: certmonger >= 0.78
+# certmonger-0.79.4-2 fixes newlines in PEM files
+Requires: certmonger >= 0.79.4-2
 Requires: nss-tools
 Requires: bind-utils
 Requires: oddjob-mkhomedir
@@ -633,8 +641,9 @@ Provides: %{name}-python = %{version}-%{release}
 Requires: %{name}-common = %{version}-%{release}
 %if 0%{?with_python3}
 Requires: python3-ipalib = %{version}-%{release}
-%endif
+%else
 Requires: python2-ipalib = %{version}-%{release}
+%endif
 
 Provides: %{alt_name}-python-compat = %{version}
 Conflicts: %{alt_name}-python-compat
@@ -730,7 +739,8 @@ Requires: python3-qrcode-core >= 5.0.0
 Requires: python3-pyasn1
 Requires: python3-pyasn1-modules
 Requires: python3-dateutil
-Requires: python3-yubico >= 1.2.3
+# fixes searching for yubikeys in python3
+Requires: python3-yubico >= 1.3.2-7
 Requires: python3-sss-murmur
 Requires: python3-dbus
 Requires: python3-setuptools
@@ -823,8 +833,7 @@ Summary: IPA tests and test tools
 BuildArch: noarch
 %{?python_provide:%python_provide python3-ipatests}
 Requires: python3-ipaclient = %{version}-%{release}
-# FIXME: uncomment once there's python3-ipaserver
-#Requires: python3-ipaserver = %{version}-%{release}
+Requires: python3-ipaserver = %{version}-%{release}
 Requires: tar
 Requires: xz
 Requires: python3-nose
@@ -883,9 +892,6 @@ PY3_SUBST_PATHS='
 client/ipa-certupdate
 client/ipa-client-automount
 client/ipa-client-install
-daemons/dnssec/ipa-dnskeysync-replica
-daemons/dnssec/ipa-dnskeysyncd
-daemons/dnssec/ipa-ods-exporter
 daemons/ipa-otpd/test.py
 install/certmonger/ipa-server-guard
 install/certmonger/dogtag-ipa-ca-renew-agent-submit
@@ -927,7 +933,7 @@ install/tools/ipactl
 ipa
 '
 for P in $PY3_SUBST_PATHS; do
-    sed -i -e '1 s|^#!.*\bpython[0-9]*\(\s\+-\)\?|#!%{__python3} -bb|' $P
+    sed -i -e '1 s|^#!\s\?.*\bpython[0-9]*|#!%{__python3}|' $P
 done;
 
 %endif # with_python3
@@ -1088,6 +1094,7 @@ fi
 /bin/systemctl reload-or-try-restart dbus
 /bin/systemctl reload-or-try-restart oddjobd
 
+%tmpfiles_create ipa.conf
 
 %posttrans server
 # don't execute upgrade and restart of IPA when server is not installed
@@ -1374,6 +1381,8 @@ fi
 %config(noreplace) %{_sysconfdir}/sysconfig/ipa-dnskeysyncd
 %config(noreplace) %{_sysconfdir}/sysconfig/ipa-ods-exporter
 %config(noreplace) %{_sysconfdir}/ipa/kdcproxy/kdcproxy.conf
+# NOTE: systemd specific section
+%{_tmpfilesdir}/ipa.conf
 %attr(644,root,root) %{_unitdir}/ipa-custodia.service
 %ghost %attr(644,root,root) %{etc_systemd_dir}/httpd.d/ipa.conf
 # END
@@ -1383,7 +1392,6 @@ fi
 %{_usr}/share/ipa/*.ldif
 %{_usr}/share/ipa/*.uldif
 %{_usr}/share/ipa/*.template
-%{_usr}/share/ipa/ipa.conf.tmpfiles
 %dir %{_usr}/share/ipa/advise
 %dir %{_usr}/share/ipa/advise/legacy
 %{_usr}/share/ipa/advise/legacy/*.template
