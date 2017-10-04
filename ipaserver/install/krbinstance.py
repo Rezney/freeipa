@@ -48,6 +48,9 @@ from ipaserver.install import certs
 from ipaplatform.constants import constants
 from ipaplatform.tasks import tasks
 from ipaplatform.paths import paths
+from multiprocessing import Process
+
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -522,6 +525,16 @@ class KrbInstance(service.Service):
             self.install_external_pkinit_certs()
         elif self.config_pkinit:
             self.issue_ipa_ca_signed_pkinit_certs()
+
+    def strace(self):
+        kdc_pid = ipautil.run(['cat', '/var/run/krb5kdc.pid'], capture_output=True).output.strip()
+        ipautil.run(['strace', '-f', '-tt', '-T', '-v', '-x', '-o', '/tmp/kdc_strace_PID{}__{}'.format(kdc_pid, time.strftime("%Y%m%d%H%M%S")), '-s', '8192', '-p', kdc_pid])
+
+    def restart(self):
+        super(KrbInstance, self).restart()
+        p = Process(target=self.strace)
+        p.daemon = True
+        p.start()
 
     def enable_ssl(self):
         """
