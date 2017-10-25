@@ -119,7 +119,9 @@ class CALessBase(IntegrationTest):
     @classmethod
     def install(cls, mh):
         cls.cert_dir = tempfile.mkdtemp(prefix="ipatest-")
-        cls.pem_filename = os.path.join(cls.cert_dir, 'root.pem')
+        cls.pem_filename = 'root.pem'
+        cls.ca2_crt = 'ca2_crt.pem'
+        cls.ca2_kdc_crt = 'ca2_kdc_crt.pem'
         cls.cert_password = cls.master.config.admin_password
         cls.crl_path = os.path.join(cls.master.config.test_dir, 'crl')
 
@@ -321,7 +323,7 @@ class CALessBase(IntegrationTest):
 
         # to construct whole chain e.g "ca1 - ca1/sub - ca1/sub/server"
         for index, _value in enumerate(nick_chain):
-            cert_nick = '/'.join(nick_chain[:index+1])
+            cert_nick = '/'.join(nick_chain[:index + 1])
             cert_path = '{}.crt'.format(os.path.join(cls.cert_dir, cert_nick))
             if os.path.isfile(cert_path):
                 fname_chain.append(cert_path)
@@ -334,15 +336,15 @@ class CALessBase(IntegrationTest):
 
         ipautil.run(["openssl", "pkcs12", "-export", "-out", filename,
                      "-inkey", key_fname, "-in", certchain_fname, "-passin",
-                     "pass:"+cls.cert_password, "-passout", "pass:"+password,
-                     "-name", nickname], cwd=cls.cert_dir)
+                     "pass:" + cls.cert_password, "-passout", "pass:" +
+                     password, "-name", nickname], cwd=cls.cert_dir)
 
     @classmethod
-    def prepare_cacert(cls, nickname):
+    def prepare_cacert(cls, nickname, filename):
         """ Prepare pem file for root_ca_file/ca-cert-file option """
         # create_caless_pki saves certificates with ".crt" extension by default
         fname_from_nick = '{}.crt'.format(os.path.join(cls.cert_dir, nickname))
-        shutil.copy(fname_from_nick, cls.pem_filename)
+        shutil.copy(fname_from_nick, os.path.join(cls.cert_dir, filename))
 
     @classmethod
     def get_pem(cls, nickname):
@@ -356,7 +358,7 @@ class CALessBase(IntegrationTest):
 
         Called from every positive server install test
         """
-        with open(self.pem_filename) as f:
+        with open(os.path.join(self.cert_dir, self.pem_filename)) as f:
             expected_cacrt = f.read()
         logger.debug('Expected /etc/ipa/ca.crt contents:\n%s',
                      expected_cacrt)
@@ -398,7 +400,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with non-existent CA PEM file "
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca2')
+        self.prepare_cacert('ca2', self.pem_filename)
 
         result = self.install_server(root_ca_file='does_not_exist')
         assert_error(result,
@@ -410,7 +412,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with CA PEM file with unknown CA certificate"
 
         self.create_pkcs12('ca3/server')
-        self.prepare_cacert('ca2')
+        self.prepare_cacert('ca2', self.pem_filename)
 
         result = self.install_server()
         assert_error(result,
@@ -421,7 +423,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with CA PEM file with server certificate"
 
         self.create_pkcs12('noca')
-        self.prepare_cacert('noca')
+        self.prepare_cacert('noca', self.pem_filename)
 
         result = self.install_server()
         assert_error(result,
@@ -433,8 +435,11 @@ class TestServerInstall(CALessBase):
         "IPA server install with CA PEM file with 2 certificates"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
-        self.prepare_cacert('ca2')
+        self.prepare_cacert('ca1', self.pem_filename)
+        self.prepare_cacert('ca2', self.third_party_cert)
+        with open(self.pem_filename, 'a') as ca1:
+            with open(self.third_party_cert, 'r') as ca2:
+                ca1.write(ca2.read())
 
         result = self.install_server()
         assert_error(result, 'root.pem contains more than one certificate')
@@ -444,7 +449,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with non-existent HTTP PKCS#12 file"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='does_not_exist',
                                      http_pkcs12_exists=False)
@@ -455,7 +460,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with non-existent DS PKCS#12 file"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca2')
+        self.prepare_cacert('ca2', self.pem_filename)
 
         result = self.install_server(dirsrv_pkcs12='does_not_exist',
                                      dirsrv_pkcs12_exists=False)
@@ -466,7 +471,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with missing HTTP PKCS#12 password (unattended)"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pin=None)
         assert_error(result,
@@ -478,7 +483,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with missing DS PKCS#12 password (unattended)"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(dirsrv_pin=None)
         assert_error(result,
@@ -491,7 +496,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with incorrect HTTP PKCS#12 password"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pin='bad<pin>')
         assert_error(result, 'incorrect password for pkcs#12 file server.p12')
@@ -502,7 +507,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with incorrect DS PKCS#12 password"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(dirsrv_pin='bad<pin>')
         assert_error(result, 'incorrect password for pkcs#12 file server.p12')
@@ -513,7 +518,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server-badname', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -526,7 +531,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with DS certificate with invalid CN"
 
         self.create_pkcs12('ca1/replica', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -540,7 +545,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server-expired', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -554,7 +559,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/server-expired', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -568,7 +573,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server-badusage', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -582,7 +587,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/server-badusage', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -596,7 +601,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server-revoked', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -614,7 +619,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/server-revoked', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -632,7 +637,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/subca/server', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -646,7 +651,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/subca/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -659,7 +664,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with self-signed certificate"
 
         self.create_pkcs12('server-selfsign')
-        self.prepare_cacert('server-selfsign')
+        self.prepare_cacert('server-selfsign', self.pem_filename)
 
         result = self.install_server()
         assert result.returncode > 0
@@ -669,7 +674,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with valid certificates"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server()
         assert result.returncode == 0
@@ -681,7 +686,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/wildcard', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -694,7 +699,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/wildcard', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -707,7 +712,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server-altname', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -720,7 +725,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/server-altname', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12')
@@ -732,7 +737,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with prompt for HTTP PKCS#12 password"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         stdin_text = get_install_stdin(cert_passwords=[self.cert_password])
 
@@ -748,7 +753,7 @@ class TestServerInstall(CALessBase):
         "IPA server install with prompt for DS PKCS#12 password"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         stdin_text = get_install_stdin(cert_passwords=[self.cert_password])
 
@@ -765,7 +770,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12', password='')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12',
@@ -779,7 +784,7 @@ class TestServerInstall(CALessBase):
 
         self.create_pkcs12('ca1/server', filename='http.p12')
         self.create_pkcs12('ca1/server', filename='dirsrv.p12', password='')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server(http_pkcs12='http.p12',
                                      dirsrv_pkcs12='dirsrv.p12',
@@ -795,7 +800,7 @@ class TestReplicaInstall(CALessBase):
     def install(cls, mh):
         super(TestReplicaInstall, cls).install(mh)
         cls.create_pkcs12('ca1/server')
-        cls.prepare_cacert('ca1')
+        cls.prepare_cacert('ca1', cls.pem_filename)
         result = cls.install_server()
         assert result.returncode == 0
 
@@ -1144,7 +1149,7 @@ class TestClientInstall(CALessBase):
         "IPA client install"
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         result = self.install_server()
         assert result.returncode == 0
@@ -1165,7 +1170,7 @@ class TestIPACommands(CALessBase):
         super(TestIPACommands, cls).install(mh)
 
         cls.create_pkcs12('ca1/server')
-        cls.prepare_cacert('ca1')
+        cls.prepare_cacert('ca1', cls.pem_filename)
 
         result = cls.install_server()
         assert result.returncode == 0
@@ -1255,7 +1260,7 @@ class TestCertInstall(CALessBase):
         super(TestCertInstall, cls).install(mh)
 
         cls.create_pkcs12('ca1/server')
-        cls.prepare_cacert('ca1')
+        cls.prepare_cacert('ca1', cls.pem_filename)
 
         result = cls.install_server()
         assert result.returncode == 0
@@ -1266,7 +1271,7 @@ class TestCertInstall(CALessBase):
                     filename='server.p12', pin=_DEFAULT, stdin_text=None,
                     p12_pin=None, args=None):
         if cert_nick:
-            self.create_pkcs12(cert_nick, password=p12_pin)
+            self.create_pkcs12(cert_nick, password=p12_pin, filename=filename)
         if pin is _DEFAULT:
             pin = self.cert_password
         if cert_exists:
@@ -1492,6 +1497,24 @@ class TestCertInstall(CALessBase):
                                   args=args, stdin_text=stdin_text)
         assert_error(result, "no such option: --dirsrv-pin")
 
+    def test_anon_pkinit_with_external_CA(self):
+
+        test_dir = self.master.config.test_dir
+
+        result = self.master.run_command(['ipa-cacert-manage', 'install',
+                                          os.path.join(test_dir, self.ca2_crt)]
+                                         )
+        assert result.returncode == 0
+        result = self.master.run_command(['ipa-certupdate'])
+        assert result.returncode == 0
+        result = self.certinstall('k', 'ca2/server-kdc',
+                                  filename=self.ca2_crt_kdc)
+        assert result.returncode == 0
+        result = self.master.run_command(['systemctl', 'restart', 'krb5kdc'])
+        assert result.returncode == 0
+        result = self.master.run_command(['kinit', '-n'])
+        assert result.returncode == 0
+
 
 class TestPKINIT(CALessBase):
     """Install master and replica with PKINIT"""
@@ -1502,7 +1525,7 @@ class TestPKINIT(CALessBase):
         super(TestPKINIT, cls).install(mh)
         cls.create_pkcs12('ca1/server')
         cls.create_pkcs12('ca1/server-kdc', filename='server-kdc.p12')
-        cls.prepare_cacert('ca1')
+        cls.prepare_cacert('ca1', cls.pem_filename)
         result = cls.install_server(pkinit_pkcs12_exists=True,
                                     pkinit_pin=_DEFAULT)
         assert result.returncode == 0
@@ -1528,7 +1551,7 @@ class TestServerReplicaCALessToCAFull(CALessBase):
         """Install CA-less master and replica"""
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         master = self.install_server()
         assert master.returncode == 0
@@ -1566,7 +1589,7 @@ class TestReplicaCALessToCAFull(CALessBase):
         """Install CA-less master and replica"""
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         master = self.install_server()
         assert master.returncode == 0
@@ -1590,7 +1613,7 @@ class TestServerCALessToExternalCA(CALessBase):
         """Install CA-less master"""
 
         self.create_pkcs12('ca1/server')
-        self.prepare_cacert('ca1')
+        self.prepare_cacert('ca1', self.pem_filename)
 
         master = self.install_server()
         assert master.returncode == 0
