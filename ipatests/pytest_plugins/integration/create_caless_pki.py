@@ -398,7 +398,7 @@ def gen_server_certs(nick_base, hostname, org, ca=None):
                 x509.NameAttribute(NameOID.ORGANIZATION_NAME, org),
                 x509.NameAttribute(NameOID.COMMON_NAME, u'alt-' + hostname)
              ]),
-             ca, dns_name=u'alt-' + hostname
+             ca, dns_name=hostname
              )
     gen_cert(profile_server, nick_base + u'-expired',
              x509.Name([
