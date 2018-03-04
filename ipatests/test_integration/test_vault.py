@@ -65,8 +65,8 @@ class TestInstallKRA(IntegrationTest):
             "--password", self.vault_password,
             "--data", self.vault_data,
         ])
-        time.sleep(WAIT_AFTER_ARCHIVE)
-
+        time.sleep(40)
+        tasks.repl_sync_check(self.master, self.replicas[0])
         self._retrieve_secret([self.vault_name_master])
 
     def test_create_and_retrieve_vault_replica_without_kra(self):

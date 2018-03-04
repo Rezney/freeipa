@@ -1408,3 +1408,30 @@ def sign_ca_and_transport(host, csr_name, root_ca_name, ipa_ca_name):
     host.put_file_contents(ipa_ca_fname, ipa_ca)
 
     return (root_ca_fname, ipa_ca_fname)
+
+
+def repl_sync_check(host1, host2, timeout=3):
+    print('sync repl started')
+
+    def return_ruv(host, stdout):
+        ruv_re = re.compile('ldap://{{}}:389}}(\s\w*\s)'.format(host.hostname))
+        return re.search(ruv_re, stdout)
+
+    command = ['ldapsearch', '-xLLL', '-D', 'cn=directory manager', '-w', u'Secret123', '-b', 'dc=ipa,dc=test', '(&(nsuniqueid=ffffffff-ffffffff-ffffffff-ffffffff)(objectclass=nstombstone))']
+    timeout = 10 * timeout
+    while timeout != 0:
+        host1_cmd = host1.run_command(command)
+        host1_res = host1_cmd.stdout_text
+        print(host1_cmd.stderr_text)
+        host2_cmd = host2.run_command(command)
+        host2_res = host1_cmd.stdout_text
+        print(host2_cmd.stderr_text)
+        if return_ruv(host1, host1_res) == return_ruv(host2, host2_res):
+            print('we are SYNCED !!! Yhooo')
+            return True
+        else:
+            time.sleep(10)
+            print('sleeping 10 sec')
+            timeout -= 10
+    print('vracam sa')
+    return False
