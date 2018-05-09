@@ -1369,6 +1369,11 @@ class UI_driver(object):
             # fill dialog
             self.fill_fields(record['add'], combobox_input=combobox_input)
 
+            # here we return before clicking "add" for testing confirmation
+            # using ENTER key
+            if not dialog_btn:
+                return
+
             btn = dialog_btn
 
             if record != last_element:

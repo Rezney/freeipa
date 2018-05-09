@@ -513,7 +513,7 @@ class test_user(user_tasks):
         self.close_all_dialogs()
 
         # add user using enter
-        self.add_record(user.ENTITY, user.DATA2, negative=True)
+        self.add_record(user.ENTITY, user.DATA2, dialog_btn=None)
         actions = ActionChains(self.driver)
         actions.send_keys(Keys.ENTER).perform()
         self.wait()

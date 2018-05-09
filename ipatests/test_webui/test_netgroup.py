@@ -68,7 +68,7 @@ class test_netgroup(UI_driver):
                         delete=True)
 
         # add netgroup using enter
-        self.add_record(netgroup.ENTITY, netgroup.DATA, negative=True)
+        self.add_record(netgroup.ENTITY, netgroup.DATA, dialog_btn=None)
         actions = ActionChains(self.driver)
         actions.send_keys(Keys.ENTER).perform()
         self.wait_for_request()
