@@ -100,6 +100,8 @@ class test_automember(UI_driver):
         host1 = 'web1.%s' % domain
         host2 = 'web2.%s' % domain
 
+        assert False
+
         # Add a hostgroup
         self.add_record('hostgroup', {
             'pkey': 'webservers',
@@ -180,7 +182,7 @@ class test_automember(UI_driver):
         Test automember rebuild membership feature for users
         """
         self.init_app()
-
+        self.facet_button_click('refres')
         # Add a group
         self.add_record('group', {
             'pkey': 'devel',
