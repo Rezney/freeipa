@@ -182,10 +182,11 @@ def backup_file(host, filename):
 def fix_hostname(host):
     backup_file(host, paths.ETC_HOSTNAME)
     host.put_file_contents(paths.ETC_HOSTNAME, host.hostname + '\n')
+    #host.run_command(['python3 -c "import paramiko; print(paramiko.__version__)"'])
     host.run_command(['hostname', host.hostname])
 
     backupname = os.path.join(host.config.test_dir, 'backup_hostname')
-    host.run_command('hostname > %s' % ipautil.shell_quote(backupname))
+    #host.run_command('hostname > %s' % ipautil.shell_quote(backupname))
 
 
 def host_service_active(host, service):
