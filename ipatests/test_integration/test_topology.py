@@ -249,7 +249,7 @@ class TestCASpecificRUVs(IntegrationTest):
             "Replica RUVs were not clean during replica uninstallation")
 
 
-class TestReplicaManageDel(IntegrationTest):
+class TestReplicaManageDelDL0(IntegrationTest):
     domain_level = 0
     topology = 'star'
     num_replicas = 3
@@ -302,6 +302,12 @@ class TestReplicaManageDel(IntegrationTest):
                                       master.config.dirman_password])
         assert(replica.hostname not in result2.stdout_text), (
             "Replica's RUV was not removed by a clean-dangling-ruv command")
+
+
+class TestReplicaManageDelDL1(IntegrationTest):
+    domain_level = 1
+    topology = 'star'
+    num_replicas = 3
 
     def test_replica_managed_del_domlevel1(self):
         """
