@@ -240,6 +240,8 @@ class IPAUpgrade(service.Service):
         with open(ldif_outfile, "w") as out_file:
             with open(self.filename, "r") as in_file:
                 parser = GetEntryFromLDIF(in_file, entries_dn=[COMPAT_DN])
+                import os
+                os.seek(in_file, 0)
                 parser.parse()
                 try:
                     compat_entry = parser.get_results()[COMPAT_DN]
